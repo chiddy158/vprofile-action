@@ -1,15 +1,12 @@
 name: vprofile actions
-
-on:
-  workflow_dispatch
-
+on: workflow_dispatch
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: githubactions
   EKS_CLUSTER: vprofile-eks
 
 jobs:
-  testing:
+  Testing:
     runs-on: ubuntu-latest
 
     steps:
@@ -51,4 +48,4 @@ jobs:
 
 env:
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  SONAR_URL: ${{ secrets.SONAR_URL }} # OPTIONAL
+  SONAR_HOST_URL: ${{ secrets.SONAR_URL }} # OPTIONAL
