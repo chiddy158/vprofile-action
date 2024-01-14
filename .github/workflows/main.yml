@@ -1,13 +1,12 @@
 name: vprofile actions
-on: 
+on:
   workflow_dispatch
-
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: githubactions
   EKS_CLUSTER: vprofile-eks
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  SONAR_HOST_URL: ${{ secrets.SONAR_URL }} 
+  SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
 
 jobs:
   Testing:
@@ -48,7 +47,7 @@ jobs:
         id: sonarqube-quality-gate-check
         uses: sonarsource/sonarqube-quality-gate-action@master
         timeout-minutes: 5
- 
+
   BUILD_AND_PUBLISH:
     needs: Testing
     runs-on: ubuntu-latest
@@ -68,3 +67,39 @@ jobs:
           daemon_off: false
           dockerfile: ./Dockerfile
           context: ./
+
+  DeployToEKS:
+    needs: BUILD_AND_PUBLISH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ${{ env.AWS_REGION}}
+
+      - name: Get Kube Config file
+        uses: aws/eks@v1
+        with:
+          command: eks-update-kubeconfig
+          cluster-name: ${{ env.EKS_CLUSTER }}
+          region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: kubectl create secret docker-registry regcred --docker-server=${{ secrets.REGISTRY }} --docker-username=AWS --docker-password=$(aws ecr get-login-password)
+
+      - name: Deploy Helm
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.8
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION}}
+          cluster-name: ${{ env.EKS_CLUSTER}}
+          chart-path: helm/vprofilecharts
+          namespace: default
+          values: appimage=${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY}},apptag=${{ github.run_number}}
+          name: vprofile-stack
